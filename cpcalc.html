@@ -2,8 +2,8 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dolby CP Master Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CP Calculator</title>
 <link href="https://fonts.cdnfonts.com/css/digital-7-mono" rel="stylesheet">
 
 <style>
@@ -114,7 +114,7 @@ height:320px;
 width:50px;
 }
 
-/* Fester Referenzstrich bei CP 7.0 */
+/* Fester Referenzstrich bei 7.0 */
 .marker{
 position:absolute;
 bottom:calc((7 - 0) / (10 - 0) * 320px);
@@ -198,31 +198,42 @@ padding:15px;
 
 .main{
 flex-direction:column;
-gap:25px;
+gap:30px;
 }
 
 .fader-wrapper{
 width:100%;
+padding:10px 0;
 }
 
 input[type=range]{
-writing-mode:horizontal-tb;
 -webkit-appearance:none;
+appearance:none;
 width:100%;
-height:40px;
+height:60px;
+background:transparent;
+}
+
+input[type=range]::-webkit-slider-runnable-track{
+height:8px;
+background:#333;
+border-radius:4px;
 }
 
 input[type=range]::-webkit-slider-thumb{
 -webkit-appearance:none;
-height:30px;
-width:30px;
+appearance:none;
+height:44px;
+width:44px;
+margin-top:-18px;
 background:var(--accent);
 border-radius:50%;
+box-shadow:0 0 12px rgba(245,196,0,0.6);
 cursor:pointer;
 }
 
 .marker{
-display:none; /* Marker nur im Desktop-Modus */
+display:none;
 }
 
 .cp-value{
@@ -235,11 +246,12 @@ font-size:32px;
 
 .presets{
 flex-direction:column;
+gap:12px;
 }
 
 .presets button{
 width:100%;
-padding:14px;
+padding:16px;
 font-size:18px;
 }
 
@@ -258,7 +270,7 @@ font-size:18px;
 <button class="cp-btn" onclick="stepCP(0.1)">+</button>
 </div>
 
-<div class="dbc-small" id="dbcDisplay">85.0 dB(C) SPL @ -20 dBFS</div>
+<div class="dbc-small" id="dbcDisplay"></div>
 <div class="led" id="refLed"></div>
 </div>
 
@@ -271,12 +283,12 @@ font-size:18px;
 <div class="readouts">
 <div class="readout">
 <label>CINEMA ATTENUATION in dB</label>
-<div class="value" id="attCinema" contenteditable="true">0.00</div>
+<div class="value" id="attCinema" contenteditable="true"></div>
 </div>
 
 <div class="readout">
 <label>TV ATTENUATION in dB</label>
-<div class="value" id="attTV" contenteditable="true">6.00</div>
+<div class="value" id="attTV" contenteditable="true"></div>
 </div>
 </div>
 </div>
@@ -300,6 +312,9 @@ Copyright Alexander Wunsch 2026
 const STEP=10/3;
 const CINEMA_REF=7.0;
 const TV_REF=5.2;
+const TOL=0.01;
+
+let lastCP=null;
 
 const slider=document.getElementById("slider");
 const cpDisplay=document.getElementById("cpDisplay");
@@ -307,6 +322,12 @@ const dbcDisplay=document.getElementById("dbcDisplay");
 const attCinema=document.getElementById("attCinema");
 const attTV=document.getElementById("attTV");
 const led=document.getElementById("refLed");
+
+function vibrateShort(){
+    if("vibrate" in navigator){
+        navigator.vibrate(30);
+    }
+}
 
 function cpToAttCinema(cp){
     if(Math.abs(cp)<0.0001) return null;
@@ -346,27 +367,27 @@ function update(cp){
         const attT=attC+6;
         attCinema.textContent=attC.toFixed(2);
         attTV.textContent=attT.toFixed(2);
-        colorize(attCinema,attC);
-        colorize(attTV,attT);
     }
 
-    const TOL=0.01;
+    // LED + HAPTIC
     if(Math.abs(cp-TV_REF)<TOL){
         led.style.background="var(--led-tv)";
         led.style.boxShadow="0 0 15px yellow";
+        if(lastCP!==null && Math.abs(lastCP-TV_REF)>=TOL){
+            vibrateShort();
+        }
     }else if(Math.abs(cp-CINEMA_REF)<TOL){
         led.style.background="var(--led-cinema)";
         led.style.boxShadow="0 0 15px red";
+        if(lastCP!==null && Math.abs(lastCP-CINEMA_REF)>=TOL){
+            vibrateShort();
+        }
     }else{
         led.style.background="var(--led-off)";
         led.style.boxShadow="none";
     }
-}
 
-function colorize(el,val){
-    if(val>0){el.style.color="var(--accent)";}
-    else if(val<0){el.style.color="var(--cut)";}
-    else{el.style.color="var(--zero)";}
+    lastCP=cp;
 }
 
 function setCP(v){update(v);}
@@ -376,33 +397,6 @@ function stepCP(step){
 }
 
 slider.addEventListener("input",e=>update(e.target.value));
-
-function handleEnter(e,callback){
-    if(e.key==="Enter"){
-        e.preventDefault();
-        callback();
-    }
-}
-
-cpDisplay.addEventListener("keydown",e=>{
-    handleEnter(e,()=>update(cpDisplay.textContent));
-});
-
-attCinema.addEventListener("keydown",e=>{
-    handleEnter(e,()=>{
-        if(attCinema.textContent.trim()==="-∞"){update(0);return;}
-        let val=parseFloat(attCinema.textContent);
-        if(!isNaN(val)) update(attCinemaToCp(val));
-    });
-});
-
-attTV.addEventListener("keydown",e=>{
-    handleEnter(e,()=>{
-        if(attTV.textContent.trim()==="-∞"){update(0);return;}
-        let val=parseFloat(attTV.textContent);
-        if(!isNaN(val)) update(attCinemaToCp(val-6));
-    });
-});
 
 update(7.0);
 </script>
