@@ -185,24 +185,19 @@ opacity:0.4;
 }
 
 /* MOBILE */
-
 @media (max-width:768px){
-
 body{
 align-items:flex-start;
 padding:15px;
 }
-
 .main{
 flex-direction:column;
 gap:30px;
 }
-
 .fader-wrapper{
 width:100%;
 padding:10px 0;
 }
-
 input[type=range]{
 -webkit-appearance:none;
 appearance:none;
@@ -210,13 +205,11 @@ width:100%;
 height:60px;
 background:transparent;
 }
-
 input[type=range]::-webkit-slider-runnable-track{
 height:8px;
 background:#333;
 border-radius:4px;
 }
-
 input[type=range]::-webkit-slider-thumb{
 -webkit-appearance:none;
 appearance:none;
@@ -228,30 +221,24 @@ border-radius:50%;
 box-shadow:0 0 12px rgba(245,196,0,0.6);
 cursor:pointer;
 }
-
 .marker{
 display:none;
 }
-
 .cp-value{
 font-size:56px;
 }
-
 .value{
 font-size:32px;
 }
-
 .presets{
 flex-direction:column;
 gap:12px;
 }
-
 .presets button{
 width:100%;
 padding:16px;
 font-size:18px;
 }
-
 }
 </style>
 </head>
@@ -280,12 +267,12 @@ font-size:18px;
 <div class="readouts">
 <div class="readout">
 <label>CINEMA ATTENUATION in dB</label>
-<div class="value" id="attCinema"></div>
+<div class="value" id="attCinema" contenteditable="true"></div>
 </div>
 
 <div class="readout">
 <label>TV ATTENUATION in dB</label>
-<div class="value" id="attTV"></div>
+<div class="value" id="attTV" contenteditable="true"></div>
 </div>
 </div>
 </div>
@@ -344,6 +331,15 @@ function cpToDbc(cp){
     return 75 + (cp-4.0)*20;
 }
 
+function attCinemaToCp(att){
+    if(att>=-10) return CINEMA_REF + (att/STEP);
+    return 4.0 + (att+10)/20;
+}
+
+function isValidNumber(str){
+    return /^-?\d*\.?\d*$/.test(str.trim());
+}
+
 function update(cp){
     cp=parseFloat(cp);
     if(isNaN(cp)) return;
@@ -383,13 +379,41 @@ function update(cp){
     lastCP=cp;
 }
 
+function handleEnter(e,callback){
+    if(e.key==="Enter"){
+        e.preventDefault();
+        callback();
+    }
+}
+
+function setupInput(el,convertFn){
+    el.addEventListener("keydown",e=>{
+        handleEnter(e,()=>{
+            if(!isValidNumber(el.textContent)) return;
+            let val=parseFloat(el.textContent);
+            if(!isNaN(val)) update(convertFn(val));
+        });
+    });
+}
+
+cpDisplay.addEventListener("keydown",e=>{
+    handleEnter(e,()=>{
+        if(!isValidNumber(cpDisplay.textContent)) return;
+        let val=parseFloat(cpDisplay.textContent);
+        if(!isNaN(val)) update(val);
+    });
+});
+
+setupInput(attCinema,attCinemaToCp);
+setupInput(attTV,val=>attCinemaToCp(val-6));
+
+slider.addEventListener("input",e=>update(e.target.value));
+
 function setCP(v){update(v);}
 function stepCP(step){
     let current=parseFloat(cpDisplay.textContent);
     update(current+step);
 }
-
-slider.addEventListener("input",e=>update(e.target.value));
 
 update(7.0);
 </script>
