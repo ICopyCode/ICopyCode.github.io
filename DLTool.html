@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Dolby CP Master Panel</title>
+<link href="https://fonts.cdnfonts.com/css/digital-7-mono" rel="stylesheet">
+
+<style>
+:root{
+--bg:#0a0a0a;
+--panel:#151515;
+--accent:#f5c400;
+--cut:#4aa3ff;
+--zero:#cccccc;
+--led-off:#330000;
+--led-tv:#f5c400;
+--led-cinema:red;
+}
+
+body{
+margin:0;
+background:var(--bg);
+font-family:Arial, sans-serif;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+color:white;
+}
+
+.container{
+background:var(--panel);
+padding:30px;
+border-radius:12px;
+width:600px;
+box-shadow:0 0 60px rgba(0,0,0,0.8);
+}
+
+h1{
+text-align:center;
+color:var(--accent);
+letter-spacing:3px;
+margin-bottom:20px;
+}
+
+.top-display{
+text-align:center;
+margin-bottom:20px;
+}
+
+.cp-row{
+display:flex;
+justify-content:center;
+align-items:center;
+gap:15px;
+}
+
+.cp-btn{
+background:#222;
+border:1px solid #444;
+color:white;
+padding:6px 10px;
+cursor:pointer;
+font-size:18px;
+}
+
+.cp-btn:hover{
+background:var(--accent);
+color:black;
+}
+
+.cp-value{
+font-family:'Digital-7 Mono', monospace;
+font-size:72px;
+color:var(--accent);
+text-shadow:0 0 15px rgba(245,196,0,0.7);
+outline:none;
+min-width:140px;
+}
+
+.dbc-small{
+font-size:16px;
+opacity:0.7;
+margin-top:5px;
+}
+
+.led{
+width:16px;
+height:16px;
+border-radius:50%;
+background:var(--led-off);
+margin:10px auto;
+}
+
+.main{
+display:flex;
+gap:40px;
+}
+
+.fader-wrapper{
+position:relative;
+display:flex;
+flex-direction:column;
+align-items:center;
+}
+
+input[type=range]{
+writing-mode:bt-lr;
+-webkit-appearance:slider-vertical;
+height:320px;
+width:50px;
+}
+
+.marker{
+position:absolute;
+bottom:calc((7 - 0) / (10 - 0) * 320px);
+width:60px;
+height:2px;
+background:var(--accent);
+}
+
+.readouts{
+flex:1;
+display:flex;
+flex-direction:column;
+justify-content:center;
+gap:30px;
+}
+
+.readout{
+background:#000;
+padding:15px;
+border-radius:6px;
+text-align:center;
+height:90px;
+display:flex;
+flex-direction:column;
+justify-content:center;
+}
+
+.readout label{
+font-size:12px;
+opacity:0.6;
+margin-bottom:5px;
+}
+
+.value{
+font-family:'Digital-7 Mono', monospace;
+font-size:40px;
+letter-spacing:2px;
+outline:none;
+min-height:48px;
+}
+
+.presets{
+display:flex;
+justify-content:space-between;
+margin-top:20px;
+}
+
+.presets button{
+background:#222;
+border:1px solid #444;
+color:white;
+padding:8px 14px;
+cursor:pointer;
+}
+
+.presets button:hover{
+background:var(--accent);
+color:black;
+}
+
+.footer{
+margin-top:15px;
+font-size:11px;
+text-align:center;
+opacity:0.4;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>CP CALCULATOR</h1>
+
+<div class="top-display">
+<div class="cp-row">
+<button class="cp-btn" onclick="stepCP(-0.1)">−</button>
+<div class="cp-value" id="cpDisplay" contenteditable="true">7.0</div>
+<button class="cp-btn" onclick="stepCP(0.1)">+</button>
+</div>
+
+<div class="dbc-small" id="dbcDisplay">85.0 dB(C) SPL</div>
+<div class="led" id="refLed"></div>
+</div>
+
+<div class="main">
+<div class="fader-wrapper">
+<input type="range" id="slider" min="0" max="10" step="0.1" value="7">
+<div class="marker"></div>
+</div>
+
+<div class="readouts">
+<div class="readout">
+<label>CINEMA ATTENUATION in dB</label>
+<div class="value" id="attCinema" contenteditable="true">0.00</div>
+</div>
+
+<div class="readout">
+<label>TV ATTENUATION in dB</label>
+<div class="value" id="attTV" contenteditable="true">6.00</div>
+</div>
+</div>
+</div>
+
+<div class="presets">
+<button onclick="setCP(5.0)">5.0</button>
+<button onclick="setCP(5.5)">5.5</button>
+<button onclick="setCP(6.0)">6.0</button>
+</div>
+
+<div class="footer">
+CP 7.0 = Cinema Reference | CP 5.2 = TV Reference
+</div>
+<div class="footer">
+Copyright Alexander Wunsch 2026
+</div>
+
+</div>
+
+<script>
+const STEP=3.333;
+const CINEMA_REF=7.0;
+const TV_REF=5.2;
+
+/* ---------- DOM ---------- */
+const slider=document.getElementById("slider");
+const cpDisplay=document.getElementById("cpDisplay");
+const dbcDisplay=document.getElementById("dbcDisplay");
+const attCinema=document.getElementById("attCinema");
+const attTV=document.getElementById("attTV");
+const led=document.getElementById("refLed");
+
+/* ---------- Kennlinien ---------- */
+function cpToAttCinema(cp){
+    if(cp===0) return -Infinity;
+    if(cp>=4.0) return (cp-CINEMA_REF)*STEP;
+    return -10 + (cp-4.0)*20;
+}
+
+function cpToDbc(cp){
+    if(cp===0) return -Infinity;
+    if(cp>=4.0) return 85 + (cp-CINEMA_REF)*STEP;
+    return 85 -10 + (cp-4.0)*20;
+}
+
+function attCinemaToCp(att){
+    if(att===-Infinity) return 0;
+    if(att>=-10) return CINEMA_REF + (att/STEP);
+    return 4.0 + (att+10)/20;
+}
+
+/* ---------- Update ---------- */
+function update(cp){
+    cp=parseFloat(cp);
+    if(isNaN(cp)) return;
+    if(cp<0) cp=0;
+    if(cp>10) cp=10;
+
+    slider.value=cp.toFixed(1);
+    cpDisplay.textContent=cp.toFixed(1);
+
+    const dbcVal=cpToDbc(cp);
+    dbcDisplay.textContent = (dbcVal===-Infinity ? "-∞" : dbcVal.toFixed(1)+" dB(C) SPL @ -20 dBFS");
+
+    const attC=cpToAttCinema(cp);
+
+    if(attC===-Infinity){
+        attCinema.textContent="-∞";
+        attTV.textContent="-∞";
+    } else {
+        const attT=attC+6;
+        attCinema.textContent=attC.toFixed(2);
+        attTV.textContent=attT.toFixed(2);
+        colorize(attCinema,attC);
+        colorize(attTV,attT);
+    }
+
+    // LED: Gelb bei TV 5.2, Rot bei Cinema 7.0
+    if(Math.abs(cp-5.2) < 0.05){  // TV Referenz
+        led.style.background="var(--led-tv)";
+        led.style.boxShadow="0 0 15px yellow";
+    }else if(Math.abs(cp-7.0) < 0.05){  // Cinema Referenz
+        led.style.background="var(--led-cinema)";
+        led.style.boxShadow="0 0 15px red";
+    }else{
+        led.style.background="var(--led-off)";
+        led.style.boxShadow="none";
+    }
+}
+
+function colorize(el,val){
+    if(val>0){el.style.color="var(--accent)";}
+    else if(val<0){el.style.color="var(--cut)";}
+    else{el.style.color="var(--zero)";}
+}
+
+/* ---------- Steuerung ---------- */
+function setCP(v){update(v);}
+function stepCP(step){
+    let current=parseFloat(cpDisplay.textContent);
+    update(current+step);
+}
+
+slider.addEventListener("input",e=>update(e.target.value));
+
+function handleEnter(e,callback){
+    if(e.key==="Enter"){
+        e.preventDefault();
+        callback();
+    }
+}
+
+cpDisplay.addEventListener("keydown",e=>{
+    handleEnter(e,()=>update(cpDisplay.textContent));
+});
+
+attCinema.addEventListener("keydown",e=>{
+    handleEnter(e,()=>{
+        if(attCinema.textContent.trim()==="-∞"){
+            update(0);
+            return;
+        }
+        let val=parseFloat(attCinema.textContent);
+        if(!isNaN(val)) update(attCinemaToCp(val));
+    });
+});
+
+attTV.addEventListener("keydown",e=>{
+    handleEnter(e,()=>{
+        if(attTV.textContent.trim()==="-∞"){
+            update(0);
+            return;
+        }
+        let val=parseFloat(attTV.textContent);
+        if(!isNaN(val)){
+            update(attCinemaToCp(val-6));
+        }
+    });
+});
+
+/* ---------- Initial ---------- */
+update(7.0);
+</script>
+
+</body>
+</h
